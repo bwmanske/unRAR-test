@@ -1,16 +1,19 @@
-#define MAX_PWD_LEN       10
+#include <string>
+using namespace std;
+
+#define MAX_PWD_LEN       4
 #define LA_COUNT          26
 #define UA_COUNT          26
 #define NA_COUNT          16
 #define NUM_COUNT         10
-#define RANGE_LA_LOWER    0
-#define RANGE_LA_UPPER    LA_COUNT - 1
-#define RANGE_UA_LOWER    LA_COUNT
-#define RANGE_UA_UPPER    LA_COUNT + UA_COUNT - 1
-#define RANGE_NA_LOWER    LA_COUNT + UA_COUNT + NUM_COUNT
-#define RANGE_NA_UPPER    LA_COUNT + UA_COUNT + NUM_COUNT + NA_COUNT - 1
-#define RANGE_NUM_LOWER   LA_COUNT + UA_COUNT
-#define RANGE_NUM_UPPER   LA_COUNT + UA_COUNT + NUM_COUNT - 1
+#define RANGE_LA_LOWER      0
+#define RANGE_LA_UPPER     (LA_COUNT - 1)
+#define RANGE_UA_LOWER     (LA_COUNT)
+#define RANGE_UA_UPPER    ((LA_COUNT + UA_COUNT) - 1)
+#define RANGE_NUM_LOWER    (LA_COUNT + UA_COUNT)
+#define RANGE_NUM_UPPER   ((LA_COUNT + UA_COUNT + NUM_COUNT) - 1)
+#define RANGE_NA_LOWER     (LA_COUNT + UA_COUNT + NUM_COUNT)
+#define RANGE_NA_UPPER    ((LA_COUNT + UA_COUNT + NUM_COUNT + NA_COUNT) - 1)
 
 enum {
 	PERMUTE_SUCCESS     = 0,
@@ -37,6 +40,7 @@ private:
 	bool useNAlpha;
 	bool useNumeric;
 	bool useNone;
+	bool permuteStatus = PERMUTE_SUCCESS;
 
 public:
 	Permutations();
@@ -47,6 +51,9 @@ public:
 	void set_useUAlpha(bool newValue);
 	void set_useNAlpha(bool newValue);
 	void set_useNumeric(bool newValue);
+	string get_pwdAsIndicies();
 
+private:
+	int getLowestIndex();
 };
 

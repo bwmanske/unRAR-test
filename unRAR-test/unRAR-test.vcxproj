@@ -151,10 +151,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="IniFile.cpp" />
     <ClCompile Include="Permutations.cpp" />
     <ClCompile Include="unRAR-test.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="IniFile.h" />
     <ClInclude Include="Permutations.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
