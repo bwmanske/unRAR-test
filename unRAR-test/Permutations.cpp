@@ -177,10 +177,109 @@ int Permutations::setNext()
 	return retVal;
 }
 
-string Permutations::get_pwdAsIndicies() {
+string Permutations::get_pwdAsIndicies()
+{
 	string pwdStr = to_string(testPwdLen);
-	for (int x = 0; x < testPwdLen; x++) {
+	for (int x = testPwdLen-1; x >= 0; x--) {
 		pwdStr += "," + to_string(charIndicies[x]);
+	}
+
+	return pwdStr;
+}
+
+string Permutations::get_pwdAsText()
+{
+	string pwdStr = to_string(testPwdLen) + " chars ";
+	for (int x = testPwdLen-1; x >= 0; x--) {
+		if (charIndicies[x] >= RANGE_LA_LOWER && charIndicies[x] < RANGE_LA_UPPER) {
+			pwdStr += lowerAlpha[charIndicies[x] - RANGE_LA_LOWER];
+		}
+		else if (charIndicies[x] >= RANGE_UA_LOWER && charIndicies[x] < RANGE_UA_UPPER) {
+			pwdStr += upperAlpha[charIndicies[x] - RANGE_UA_LOWER];
+		}
+		else if (charIndicies[x] >= RANGE_NUM_LOWER && charIndicies[x] < RANGE_NUM_UPPER) {
+			pwdStr += numeric[charIndicies[x] - RANGE_NUM_LOWER];
+		}
+		else if (charIndicies[x] >= RANGE_NA_LOWER && charIndicies[x] < RANGE_NA_UPPER) {
+			char tmpChar = nonAlpha[charIndicies[x] - RANGE_NA_LOWER];
+			switch (tmpChar) {
+			case '~':
+				pwdStr += "tilda";
+				break;
+			case '-':
+				pwdStr += "hyphen";
+				break;
+			case '=':
+				pwdStr += "equal";
+				break;
+			case '_':
+				pwdStr += "underscore";
+				break;
+			case '$':
+				pwdStr += "dollar";
+				break;
+			case '%':
+				pwdStr += "percent";
+				break;
+			case '+':
+				pwdStr += "plus";
+				break;
+			case '.':
+				pwdStr += "period";
+				break;
+			case ';':
+				pwdStr += "semicolon";
+				break;
+			case ':':
+				pwdStr += "colon";
+				break;
+			case '[':
+				pwdStr += "L brace";
+				break;
+			case '(':
+				pwdStr += "L parenthesis";
+				break;
+			case '{':
+				pwdStr += "L curly";
+				break;
+			case '}':
+				pwdStr += "R curly";
+				break;
+			case ')':
+				pwdStr += "R parenthesis";
+				break;
+			case ']':
+				pwdStr += "R brace";
+				break;
+			case '?':
+				pwdStr += "question";
+				break;
+			case '@':
+				pwdStr += "at";
+				break;
+			case '!':
+				pwdStr += "exclamation";
+				break;
+			case '#':
+				pwdStr += "number";
+				break;
+			case '`':
+				pwdStr += "grave";
+				break;
+			case '^':
+				pwdStr += "caret";
+				break;
+			case '*':
+				pwdStr += "asterisk";
+				break;
+			case ',':
+				pwdStr += "comma";
+				break;
+			default:
+				pwdStr += "ERROR " + to_string((int)tmpChar);
+			}
+		}
+		if (x != 0) pwdStr += ",";
 	}
 
 	return pwdStr;
@@ -195,7 +294,7 @@ int Permutations::getLowestIndex()
 	return -1;
 }
 
-char* Permutations::get_testPassword()
+char* Permutations::get_plainPassword()
 {
 	int x, y;
 	int charLookupIndex = 0;

@@ -13,7 +13,7 @@ public:
 	struct Record
 	{
 		string Comments;
-		char Commented;
+		char   Commented;
 		string Section;
 		string Key;
 		string Value;
@@ -21,7 +21,7 @@ public:
 
 	enum CommentChar
 	{
-		Pound = '#',
+		Pound     = '#',
 		SemiColon = ';'
 	};
 
