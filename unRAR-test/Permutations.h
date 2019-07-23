@@ -55,6 +55,9 @@ public:
 	void    set_useNumeric(bool newValue);
 	string  get_pwdAsIndicies();
 	string  get_pwdAsText();
+	int     get_testPwdLen();
+	void    set_charIndicies(int charIdx, int charIdxValue);
+	void    set_testPwdLen(int testLen);
 
 private:
 	int     getLowestIndex();

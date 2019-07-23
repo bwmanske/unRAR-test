@@ -8,7 +8,6 @@
 
 #include "Permutations.h"
 #include "IniFile.h"
-using namespace std;
 
 const int  triesPerLine = 13;   // 26 upper 26 lower and 26 other (10 digit + 16 punctuation)
 
@@ -19,6 +18,7 @@ long int   pastTotalSeconds = 0;
 double     triesPerSec;
 time_t     secondsDiff;
 long long  pwdCount = 1;
+int        timePrecisionValue = 2;
 
 // Filename for the INI file
 string     FileName                 = "unRAR-test.ini";
@@ -51,7 +51,7 @@ void       INI_Update(string pwdIndiciesStr, string pwdStr);
 int main()
 {
 	bool      exitRequest        = false;
-	bool      showAllTrials      = false;
+	bool      showAllTrials      = true;
 	bool      showThisTrial      = false;
 	int       status_setNext;
 	int       unrarStatus        = -1;
@@ -120,14 +120,77 @@ int main()
 			std::cout << SectionName_CurrentState << " - Section exists" << endl;
 
 			string RetValue = "";
-			std::string::size_type sz;   // alias of size_t
+			std::string::size_type sz;      // alias of size_t
+
+			// Read the Trial Count
 			RetValue = CIniFile::GetValue(Key_TrialCount, SectionName_CurrentState, FileName);
 			if (RetValue.length() == 0 || !isdigit(RetValue[0])) {
 				if (CIniFile::SetValue(Key_TrialCount, "0", SectionName_CurrentState, FileName)) cout << Key_TrialCount << " was missing - created = 0" << endl << endl;
 			}
 			else {
 				startValue = stoi(RetValue, &sz);
-				cout << Key_TrialCount << " read - " << startValue << endl;
+				if (startValue > 0) {
+					std::cout << Key_TrialCount << " read - " << startValue << endl;
+				}
+				else {
+					if (CIniFile::SetValue(Key_TrialCount, "0", SectionName_CurrentState, FileName)) cout << Key_TrialCount << " was missing - created = 0" << endl << endl;
+				}
+			}
+
+			// Read the Trial Value in the form <index count>,<index 1>,...,<index N>
+			if (startValue > 0) {
+				RetValue = CIniFile::GetValue(Key_TrialValue, SectionName_CurrentState, FileName);
+				if (RetValue.length() == 0) {
+					std::cout << Key_TrialValue << " was missing" << endl << endl;
+				}
+				else {
+					std::cout << Key_TrialValue << " read string - " << RetValue << endl;
+
+					std::string::size_type sz;      // alias of size_t
+					bool validString = false;
+					int from = 0;
+					int tmpInt[MAX_PWD_LEN + 1];
+					int tmpIntIndex = 0;
+					for (std::size_t i = 0; i < RetValue.size() && tmpIntIndex <= MAX_PWD_LEN; ++i) {
+						if (RetValue[i] == ',') {
+							tmpInt[tmpIntIndex++] = stoi(RetValue.substr(from, i), &sz);
+							from = i + 1;
+						}
+					}
+					if (from <= RetValue.size() && tmpIntIndex <= MAX_PWD_LEN) {
+						tmpInt[tmpIntIndex++] = stoi(RetValue.substr(from, RetValue.size()), &sz);
+
+						// validate the values read
+						validString = true;
+						if (tmpInt[0] > 0 && tmpInt[0] <= MAX_PWD_LEN && tmpIntIndex > 1 && tmpIntIndex <= (MAX_PWD_LEN + 1)) {
+							for (int i = 1; i <= MAX_PWD_LEN && i < tmpIntIndex; i++) {
+								if (tmpInt[i] >= 0 && tmpInt[i] <= RANGE_NA_UPPER) {
+									continue;
+								}
+								validString = false;
+							}
+						}
+						else {
+							validString = false;
+						}
+					}
+					if (!validString) {
+						cout << "Read of " << Key_TrialValue << "failed - finding key by iteration of " << Key_TrialValue << endl;
+					}
+					else {
+						mutatePassword->set_testPwdLen(tmpInt[0]);
+ 						cout << Key_TrialValue << " read ";
+						int j = 0;
+						for (int i = tmpInt[0]; i >= 1; i--) {
+							mutatePassword->set_charIndicies(j++, tmpInt[i]);
+							cout << tmpInt[i];
+							if (i > 1) cout << ", "; else cout << endl;
+						}
+						pwdStr = mutatePassword->get_plainPassword();
+						cout << "plain TrialValue - " << pwdStr << endl;
+						pwdCount = startValue;
+					}
+				}
 			}
 			cout << endl;
 		}
@@ -195,7 +258,7 @@ int main()
 				sprintf_s(tmpStr, sizeof(tmpStr), "\"c:\\Program Files\\WinRAR\\unrar.exe\" E -inul -o+ -P%s C:\\temp\\TMNTS01M6.part01.rar C:\\temp\\result", pwdStr);
 				unrarStatus = system(tmpStr);
 				if (showAllTrials || showThisTrial) {
-					sprintf_s(tmpStr, sizeof(tmpStr), " %4s", pwdStr);
+					sprintf_s(tmpStr, sizeof(tmpStr), " %*s", max(4, mutatePassword->get_testPwdLen()), pwdStr);
 					std::cout << tmpStr;
 					if (showThisTrial) {
 						if (showThisTrialCount < (triesPerLine - 1)) showThisTrialCount++; else showThisTrial = false;
@@ -240,27 +303,8 @@ int main()
 
 				currentSeconds = time(NULL);
 				if ((secondsDiff = (currentSeconds - startSeconds)) > 0) {
-					if (showAllTrials) {
-						if (pwdCount % triesPerLine == 0) {
-							infoLineStart();
-						}
-					}
-
 					if (currentSeconds != lastCurrentSeconds) {               // make sure at least a second has passed before checking these
 						lastCurrentSeconds = currentSeconds;
-						if (secondsDiff % 600 == 0) {                             // upsate the ini file every 600 seconds
-							INI_Update(mutatePassword->get_pwdAsIndicies(), mutatePassword->get_pwdAsText());
-							cout << endl
-								<< "++++++++++++++++++++++++++++++++++++++++" << endl
-								<< CIniFile::Content(FileName)
-								<< "++++++++++++++++++++++++++++++++++++++++" << endl;
-						}
-
-						if (secondsDiff % 15 == 0 && !showThisTrial && !showAllTrials) {        // show current trials every 15 seconds
-							infoLineStart();
-							showThisTrial = true;
-							showThisTrialCount = 0;
-						}
 
 						if (_kbhit() != 0) {                                  // check for a keyboard char
 							char newChar = _getch();
@@ -274,7 +318,8 @@ int main()
 									<< " q, Q - Exit this program" << endl
 									<< " s, S - Toggle Show all passwords - show every 15 seconds" << endl
 									<< " t    - Toggle show time for this session" << endl
-									<< " T    - Toggle show total time" << endl;
+									<< " T    - Toggle show total time" << endl
+									<< " 0-3  - 0-time in seconds 1-3 precision of time (Min, Hr, Days)" << endl;
 								break;
 							case 'c':                                         // Display INI content
 							case 'C':
@@ -303,9 +348,40 @@ int main()
 							case 'T':                                         // toggle show time all runs
 								showElapsedTimeTotal = !showElapsedTimeTotal;
 								break;
+							case '0':
+								timePrecisionValue = 0;
+								break;
+							case '1':
+								timePrecisionValue = 1;
+								break;
+							case '2':
+								timePrecisionValue = 2;
+								break;
+							case '3':
+								timePrecisionValue = 3;
+								break;
 							default:
 								break;
 							}
+						}
+
+						if (secondsDiff % 15 == 0 && !showThisTrial && !showAllTrials) {        // show current trials every 15 seconds
+							infoLineStart();
+							showThisTrial = true;
+							showThisTrialCount = 0;
+						}
+
+						if (secondsDiff % 600 == 0) {                             // upsate the ini file every 600 seconds
+							INI_Update(mutatePassword->get_pwdAsIndicies(), mutatePassword->get_pwdAsText());
+							cout << endl
+								<< "++++++++++++++++++++++++++++++++++++++++" << endl
+								<< CIniFile::Content(FileName)
+								<< "++++++++++++++++++++++++++++++++++++++++" << endl;
+						}
+					}
+					if (showAllTrials) {
+						if (pwdCount % triesPerLine == 0) {
+							infoLineStart();
 						}
 					}
 				}
@@ -335,11 +411,49 @@ int main()
 string elapsedTime()
 {
 	string retStr = "";
+	string tmpStr;
+	double timeValue;
 	if (showElapsedTime) {
-		retStr = to_string(secondsDiff) + "S ";
+		if (secondsDiff < 60 || timePrecisionValue == 0) {
+			retStr = to_string(secondsDiff) + ":S ";
+		}
+		else if (secondsDiff < (60 *60)) {
+			timeValue = (double)secondsDiff / 60;
+			tmpStr = to_string(timeValue);
+			retStr = tmpStr.substr(0, tmpStr.find(".") + timePrecisionValue + 1) + ":M ";
+		}
+		else if (secondsDiff < (60 * 60 * 24)) {
+			timeValue = (double)secondsDiff / (long)(60 * 60);
+			tmpStr = to_string(timeValue);
+			retStr = tmpStr.substr(0, tmpStr.find(".") + timePrecisionValue + 1) + ":H ";
+		}
+		else {
+			timeValue = (double)secondsDiff / (long)(60 * 60 * 24);
+			tmpStr = to_string(timeValue);
+			retStr = tmpStr.substr(0, tmpStr.find(".") + timePrecisionValue + 1) + ":D ";
+		}
 	}
+
 	if (showElapsedTimeTotal) {
-		retStr = retStr + to_string(pastTotalSeconds + secondsDiff) + "ST ";
+		long totalSecondsDiff = (long)pastTotalSeconds + (long)secondsDiff;
+		if (totalSecondsDiff < 60 || timePrecisionValue == 0) {
+			retStr = retStr + to_string(totalSecondsDiff) + ":S(t) ";
+		}
+		else if (totalSecondsDiff < (60 * 60)) {
+			timeValue = (double)totalSecondsDiff / 60;
+			tmpStr = to_string(timeValue);
+			retStr = retStr + tmpStr.substr(0, tmpStr.find(".") + timePrecisionValue + 1) + ":M(t) ";
+		}
+		else if (totalSecondsDiff < (60 * 60 * 24)) {
+			timeValue = (double)totalSecondsDiff / (long)(60 * 60);
+			tmpStr = to_string(timeValue);
+			retStr = retStr + tmpStr.substr(0, tmpStr.find(".") + timePrecisionValue + 1) + ":H(t) ";
+		}
+		else {
+			timeValue = (double)totalSecondsDiff / (long)(60 * 60 * 24);
+			tmpStr = to_string(timeValue);
+			retStr = retStr + tmpStr.substr(0, tmpStr.find(".") + timePrecisionValue + 1) + ":D(t) ";
+		}
 	}
 	return retStr;
 }
@@ -347,7 +461,6 @@ string elapsedTime()
 void INI_Update(string pwdIndiciesStr, string pwdStr)
 {
 	char tmpStr[250];
-	double triesPerSecond;
 
 	pwdCountStr = to_string(pwdCount);
 	CIniFile::SetValue(Key_TrialCount, pwdCountStr, SectionName_CurrentState, FileName);
@@ -375,7 +488,7 @@ void infoLineStart(void)
 		timeStr = elapsedTime();
 	}
 	triesPerSec = (double)(pwdCount - startValue) / secondsDiff;
-	sprintf_s(tmpStr, sizeof(tmpStr), "\r\n %s%lld, %5.2f: ", timeStr.c_str(), pwdCount, triesPerSec);
+	sprintf_s(tmpStr, sizeof(tmpStr), "\r\n %s%lld, %5.2f:", timeStr.c_str(), pwdCount, triesPerSec);
 	std::cout << tmpStr;
 }
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu

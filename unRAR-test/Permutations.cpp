@@ -191,16 +191,16 @@ string Permutations::get_pwdAsText()
 {
 	string pwdStr = to_string(testPwdLen) + " chars ";
 	for (int x = testPwdLen-1; x >= 0; x--) {
-		if (charIndicies[x] >= RANGE_LA_LOWER && charIndicies[x] < RANGE_LA_UPPER) {
+		if (charIndicies[x] >= RANGE_LA_LOWER && charIndicies[x] <= RANGE_LA_UPPER) {
 			pwdStr += lowerAlpha[charIndicies[x] - RANGE_LA_LOWER];
 		}
-		else if (charIndicies[x] >= RANGE_UA_LOWER && charIndicies[x] < RANGE_UA_UPPER) {
+		else if (charIndicies[x] >= RANGE_UA_LOWER && charIndicies[x] <= RANGE_UA_UPPER) {
 			pwdStr += upperAlpha[charIndicies[x] - RANGE_UA_LOWER];
 		}
-		else if (charIndicies[x] >= RANGE_NUM_LOWER && charIndicies[x] < RANGE_NUM_UPPER) {
+		else if (charIndicies[x] >= RANGE_NUM_LOWER && charIndicies[x] <= RANGE_NUM_UPPER) {
 			pwdStr += numeric[charIndicies[x] - RANGE_NUM_LOWER];
 		}
-		else if (charIndicies[x] >= RANGE_NA_LOWER && charIndicies[x] < RANGE_NA_UPPER) {
+		else if (charIndicies[x] >= RANGE_NA_LOWER && charIndicies[x] <= RANGE_NA_UPPER) {
 			char tmpChar = nonAlpha[charIndicies[x] - RANGE_NA_LOWER];
 			switch (tmpChar) {
 			case '~':
@@ -341,4 +341,19 @@ void Permutations::set_useNumeric(bool newValue)
 {
 	useNumeric = newValue;
 	useNone = !(useLAlpha || useUAlpha || useNumeric || useNAlpha);
+}
+
+void Permutations::set_charIndicies(int charIdx, int charIdxValue)
+{
+	charIndicies[charIdx] = charIdxValue;
+}
+
+void Permutations::set_testPwdLen(int testLen)
+{
+	testPwdLen = testLen;
+}
+
+int Permutations::get_testPwdLen()
+{
+	return testPwdLen;
 }
