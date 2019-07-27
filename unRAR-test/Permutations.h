@@ -1,7 +1,7 @@
 #include <string>
 using namespace std;
 
-#define MAX_PWD_LEN         4
+#define MAX_PWD_LEN        10
 #define LA_COUNT           26
 #define UA_COUNT           26
 #define NA_COUNT           23
