@@ -11,6 +11,10 @@
 
 const int  triesPerLine = 10;   // 26 upper 26 lower and 26 other (10 digit + 16 punctuation)
 
+bool       CL_useUalpha;
+bool       CL_useLalpha;
+bool       CL_useSpecial;
+bool       CL_useNumeric;
 bool       showIniContent = false;
 bool       showElapsedTime = false;
 bool       showElapsedTimeTotal = false;
@@ -28,8 +32,11 @@ long long  pwdCount = 1;
 int        timePrecisionValue = 2;
 int        precisionValue = 2;
 
-// Filename for the INI file
-string     FileName                 = "unRAR-test.ini";
+// default Filename for the UNR status file
+string     UNR_FileName             = "unRAR-test.unr";
+string     InFileName               = "unRaR-test.rar";
+string     CL_UNR_FileName          = "";                   // from the command line
+string     CL_InFileName            = "";                   // from the command line
 
 // CurrentState Section
 string     SectionName_CurrentState = "CurrentState";
@@ -38,6 +45,7 @@ string     Key_TrialValue           = "TrialValue";
 
 // InitState Section
 string     SectionName_InitState    = "InitState";
+string     Key_InFileName           = "InFileName";
 string     Key_LAlpha               = "Use_Lower_Alpha_Chars";
 string     Key_UAlpha               = "Use_Upper_Alpha_Chars";
 string     Key_NAlpha               = "Use_Non_Alpha_Chars";
@@ -53,11 +61,12 @@ string     Key_SessionSeconds       = "SessionSeconds";
 // 
 string     pwdCountStr              = "";
 
+void       commandLineError(string errorInfo);
 string     elapsedTime();
 void       infoLineStart(string pwdAsIndicies, string pwdAsText);
 void       INI_Update(string pwdIndiciesStr, string pwdStr);
 
-int main()
+int main(int argc, char** argv)
 {
 	bool      exitRequest        = false;
 	bool      showAllTrials      = false;
@@ -71,49 +80,149 @@ int main()
 	char      tmpStr[250];
 	char *    pwdStr = nullptr;
 
+	cout << "Command Line and " << argc-1 << " arguments:" << endl;
+	cout << "   " << argv[0] << endl;
+	if (argc > 1) {
+		int i = 1;
+		while (argv[i] != NULL) {
+			cout << "   " << i << ", " << argv[i] << endl;
+			if (argv[i][0] == '-' && argv[i][2] != ' ') {
+				argv[i][1] = tolower(argv[i][1]);
+				switch (argv[i][1]) {
+				case 'h':
+					commandLineError("Command Line Help -");
+					return 1;
+				case 'f':
+					CL_InFileName = (string)&argv[i][2];
+					break;
+				case 'i':
+					CL_UNR_FileName = (string)&argv[i][2];
+					break;
+				case 'p':
+					argv[i][2] = tolower(argv[i][2]);
+					argv[i][3] = tolower(argv[i][3]);
+					switch (argv[i][2]) {
+					case 'u':
+						if (argv[i][3] == 'f' || argv[i][3] == 't') {
+							CL_useUalpha = (argv[i][3] == 'f') ? false : true;
+						}
+						else {
+							commandLineError("invalid option for \"-pu\" - " + (string)argv[i]);
+							return 1;
+						}
+						break;
+					case 'l':
+						if (argv[i][3] == 'f' || argv[i][3] == 't') {
+							CL_useLalpha = (argv[i][3] == 'f') ? false : true;
+						}
+						else {
+							commandLineError("invalid option for \"-pl\" - " + (string)argv[i]);
+							return 1;
+						}
+						break;
+					case 'n':
+						if (argv[i][3] == 'f' || argv[i][3] == 't') {
+							CL_useNumeric = (argv[i][3] == 'f') ? false : true;
+						}
+						else {
+							commandLineError("invalid option for \"-pn\" - " + (string)argv[i]);
+							return 1;
+						}
+						break;
+					case 's':
+						if (argv[i][3] == 'f' || argv[i][3] == 't') {
+							CL_useSpecial = (argv[i][3] == 'f') ? false : true;
+						}
+						else {
+							commandLineError("invalid option for \"-ps\" - " + (string)argv[i]);
+							return 1;
+						}
+						break;
+					default:
+						commandLineError("invalid option for \"-p\" - " + (string)argv[i]);
+						return 1;
+					}
+					break;
+				default:
+					commandLineError("invalid command line argument - " + (string)argv[i]);
+					return 1;
+				}
+			}
+			else {
+				commandLineError("no dash found in command line - " + (string)argv[i]);
+				return 1;
+			}
+			i++;
+		}
+		if (CL_InFileName == "") {
+			ifstream f1(CL_InFileName.c_str());
+			if (!f1.good()) {
+				commandLineError("Target file not found - " + CL_InFileName);
+				return 1;
+			}
+		}
+		if (CL_UNR_FileName == "") {
+			ifstream f2(CL_UNR_FileName.c_str());
+			if (!f2.good()) {
+				commandLineError("UNR file not found - " + CL_UNR_FileName);
+				return 1;
+			}
+		}
+	}
+
 	lastShowContent = time(NULL);
 	Permutations *mutatePassword = new Permutations;
-	if (CIniFile::DoesFileExist(FileName)) {
-		std::cout << FileName << " - INI File exists" << endl << endl;      // time to read the file
+	if (CIniFile::DoesFileExist(UNR_FileName)) {
+		std::cout << endl << UNR_FileName << " - File exists" << endl << endl;      // time to read the file
 
-		if (CIniFile::SectionExists(SectionName_InitState, FileName)) {
+		if (CIniFile::SectionExists(SectionName_InitState, UNR_FileName)) {
+			string RetValue = "";
 			std::cout << SectionName_InitState << " - Section exists" << endl;
 
-			string RetValue = "";
-			RetValue = CIniFile::GetValue(Key_LAlpha, SectionName_InitState, FileName);
+			// read the input file name from the UNR file
+			InFileName = CIniFile::GetValue(Key_InFileName, SectionName_InitState, UNR_FileName);
+			ifstream f(InFileName.c_str());
+			if (!f.good()) {
+				cout << "Input File Does Not Exist" << endl;
+				return 1;
+			}
+			else
+				cout << Key_InFileName << " read - " << InFileName << endl;
+
+			RetValue = CIniFile::GetValue(Key_LAlpha, SectionName_InitState, UNR_FileName);
 			RetValue[0] = toupper(RetValue[0]);
 			if (RetValue.length() == 0 || (RetValue[0] != 'T' && RetValue[0] != 'F')) {
-				if (CIniFile::SetValue(Key_LAlpha, "True", SectionName_InitState, FileName)) cout << Key_LAlpha << " was missing - created = True" << endl << endl;
+				if (CIniFile::SetValue(Key_LAlpha, "True", SectionName_InitState, UNR_FileName)) cout << Key_LAlpha << " was missing - created = True" << endl << endl;
 			}
 			else {
 				if (RetValue[0] == 'T') mutatePassword->set_useLAlpha(true); else mutatePassword->set_useLAlpha(false);
 				cout << Key_LAlpha << " read - " << ((RetValue[0] == 'T') ? "true" : "false") << endl;
 			}
 
-			RetValue = CIniFile::GetValue(Key_UAlpha, SectionName_InitState, FileName);
+			RetValue = CIniFile::GetValue(Key_UAlpha, SectionName_InitState, UNR_FileName);
 			RetValue[0] = toupper(RetValue[0]);
 			if (RetValue.length() == 0 || (RetValue[0] != 'T' && RetValue[0] != 'F')) {
-				if (CIniFile::SetValue(Key_UAlpha, "True", SectionName_InitState, FileName)) cout << Key_UAlpha << " was missing - created = True" << endl << endl;
+				if (CIniFile::SetValue(Key_UAlpha, "True", SectionName_InitState, UNR_FileName)) cout << Key_UAlpha << " was missing - created = True" << endl << endl;
 			}
 			else {
 				if (RetValue[0] == 'T') mutatePassword->set_useUAlpha(true); else mutatePassword->set_useUAlpha(false);
 				cout << Key_UAlpha << " read - " << ((RetValue[0] == 'T') ? "true" : "false") << endl;
 			}
 
-			RetValue = CIniFile::GetValue(Key_NAlpha, SectionName_InitState, FileName);
+			RetValue = CIniFile::GetValue(Key_NAlpha, SectionName_InitState, UNR_FileName);
 			RetValue[0] = toupper(RetValue[0]);
 			if (RetValue.length() == 0 || (RetValue[0] != 'T' && RetValue[0] != 'F')) {
-				if (CIniFile::SetValue(Key_NAlpha, "True", SectionName_InitState, FileName)) cout << Key_NAlpha << " was missing - created = True" << endl << endl;
+				if (CIniFile::SetValue(Key_NAlpha, "True", SectionName_InitState, UNR_FileName)) cout << Key_NAlpha << " was missing - created = True" << endl << endl;
 			}
 			else {
 				if (RetValue[0] == 'T') mutatePassword->set_useNAlpha(true); else mutatePassword->set_useNAlpha(false);
 				cout << Key_NAlpha << " read - " << ((RetValue[0] == 'T') ? "true" : "false") << endl;
 			}
 
-			RetValue = CIniFile::GetValue(Key_Numeric, SectionName_InitState, FileName);
+			RetValue = CIniFile::GetValue(Key_Numeric, SectionName_InitState, UNR_FileName);
 			RetValue[0] = toupper(RetValue[0]);
 			if (RetValue.length() == 0 || (RetValue[0] != 'T' && RetValue[0] != 'F')) {
-				if (CIniFile::SetValue(Key_Numeric, "True", SectionName_InitState, FileName)) cout << Key_Numeric << " was missing - created = True" << endl << endl;
+				if (CIniFile::SetValue(Key_Numeric, "True", SectionName_InitState, UNR_FileName)) cout << Key_Numeric << " was missing - created = True" << endl << endl;
 			}
 			else {
 				if (RetValue[0] == 'T') mutatePassword->set_useNumeric(true); else mutatePassword->set_useNumeric(false);
@@ -125,16 +234,16 @@ int main()
 			std::cout << SectionName_InitState << " - Section does not exist" << endl << endl;
 		}
 
-		if (CIniFile::SectionExists(SectionName_CurrentState, FileName)) {
+		if (CIniFile::SectionExists(SectionName_CurrentState, UNR_FileName)) {
 			std::cout << SectionName_CurrentState << " - Section exists" << endl;
 
 			string RetValue = "";
 			std::string::size_type sz;      // alias of size_t
 
 			// Read the Trial Count
-			RetValue = CIniFile::GetValue(Key_TrialCount, SectionName_CurrentState, FileName);
+			RetValue = CIniFile::GetValue(Key_TrialCount, SectionName_CurrentState, UNR_FileName);
 			if (RetValue.length() == 0 || !isdigit(RetValue[0])) {
-				if (CIniFile::SetValue(Key_TrialCount, "0", SectionName_CurrentState, FileName)) cout << Key_TrialCount << " was missing - created = 0" << endl << endl;
+				if (CIniFile::SetValue(Key_TrialCount, "0", SectionName_CurrentState, UNR_FileName)) cout << Key_TrialCount << " was missing - created = 0" << endl << endl;
 			}
 			else {
 				startValue = stoi(RetValue, &sz);
@@ -142,13 +251,13 @@ int main()
 					std::cout << Key_TrialCount << " read - " << startValue << endl;
 				}
 				else {
-					if (CIniFile::SetValue(Key_TrialCount, "0", SectionName_CurrentState, FileName)) cout << Key_TrialCount << " was missing - created = 0" << endl << endl;
+					if (CIniFile::SetValue(Key_TrialCount, "0", SectionName_CurrentState, UNR_FileName)) cout << Key_TrialCount << " was missing - created = 0" << endl << endl;
 				}
 			}
 
 			// Read the Trial Value in the form <index count>,<index 1>,...,<index N>
 			if (startValue > 0) {
-				RetValue = CIniFile::GetValue(Key_TrialValue, SectionName_CurrentState, FileName);
+				RetValue = CIniFile::GetValue(Key_TrialValue, SectionName_CurrentState, UNR_FileName);
 				if (RetValue.length() == 0) {
 					std::cout << Key_TrialValue << " was missing" << endl << endl;
 				}
@@ -207,14 +316,14 @@ int main()
 			std::cout << SectionName_CurrentState << " - Section does not exist" << endl << endl;
 		}
 
-		if (CIniFile::SectionExists(SectionName_Performance, FileName)) {
+		if (CIniFile::SectionExists(SectionName_Performance, UNR_FileName)) {
 			std::cout << SectionName_Performance << " - Section exists" << endl;
 
 			string RetValue = "";
 			std::string::size_type sz;   // alias of size_t
-			RetValue = CIniFile::GetValue(Key_TotalSeconds, SectionName_Performance, FileName);
+			RetValue = CIniFile::GetValue(Key_TotalSeconds, SectionName_Performance, UNR_FileName);
 			if (RetValue.length() == 0 || !isdigit(RetValue[0])) {
-				if (CIniFile::SetValue(Key_TotalSeconds, "0", SectionName_Performance, FileName)) cout << Key_TotalSeconds << " was missing - created = 0" << endl << endl;
+				if (CIniFile::SetValue(Key_TotalSeconds, "0", SectionName_Performance, UNR_FileName)) cout << Key_TotalSeconds << " was missing - created = 0" << endl << endl;
 			}
 			else {
 				pastTotalSeconds = stoi(RetValue, &sz);
@@ -227,8 +336,8 @@ int main()
 		}
 	}
 	else {
-		if (CIniFile::Create(FileName)) {
-			std::cout << FileName << " - was successfully created" << endl << endl;
+		if (CIniFile::Create(UNR_FileName)) {
+			std::cout << UNR_FileName << " - was successfully created" << endl << endl;
 			mutatePassword->set_useLAlpha(true);
 			mutatePassword->set_useUAlpha(true);
 			mutatePassword->set_useNumeric(true);
@@ -236,18 +345,18 @@ int main()
 
 			startValue = 0;
 
-			if (CIniFile::SetValue(Key_LAlpha,  "True", SectionName_InitState, FileName)) cout << Key_LAlpha  << " was successfully created" << endl << endl;
-			if (CIniFile::SetValue(Key_UAlpha,  "True", SectionName_InitState, FileName)) cout << Key_UAlpha  << " was successfully created" << endl << endl;
-			if (CIniFile::SetValue(Key_NAlpha,  "True", SectionName_InitState, FileName)) cout << Key_NAlpha  << " was successfully created" << endl << endl;
-			if (CIniFile::SetValue(Key_Numeric, "True", SectionName_InitState, FileName)) cout << Key_Numeric << " was successfully created" << endl << endl;
+			if (CIniFile::SetValue(Key_LAlpha,  "True", SectionName_InitState, UNR_FileName)) cout << Key_LAlpha  << " was successfully created" << endl << endl;
+			if (CIniFile::SetValue(Key_UAlpha,  "True", SectionName_InitState, UNR_FileName)) cout << Key_UAlpha  << " was successfully created" << endl << endl;
+			if (CIniFile::SetValue(Key_NAlpha,  "True", SectionName_InitState, UNR_FileName)) cout << Key_NAlpha  << " was successfully created" << endl << endl;
+			if (CIniFile::SetValue(Key_Numeric, "True", SectionName_InitState, UNR_FileName)) cout << Key_Numeric << " was successfully created" << endl << endl;
 
-			if (CIniFile::SetValue(Key_TrialCount, "0", SectionName_CurrentState, FileName)) cout << Key_TrialCount << " was successfully created" << endl << endl;
-			if (CIniFile::SetValue(Key_TrialValue, "a", SectionName_CurrentState, FileName)) cout << Key_TrialValue << " was successfully created" << endl << endl;
+			if (CIniFile::SetValue(Key_TrialCount, "0", SectionName_CurrentState, UNR_FileName)) cout << Key_TrialCount << " was successfully created" << endl << endl;
+			if (CIniFile::SetValue(Key_TrialValue, "a", SectionName_CurrentState, UNR_FileName)) cout << Key_TrialValue << " was successfully created" << endl << endl;
 
-			if (CIniFile::SetValue(Key_TotalSeconds, "0", SectionName_Performance, FileName)) cout << Key_TotalSeconds << " was successfully created" << endl << endl;
+			if (CIniFile::SetValue(Key_TotalSeconds, "0", SectionName_Performance, UNR_FileName)) cout << Key_TotalSeconds << " was successfully created" << endl << endl;
 		}
 		else {
-			std::cout << "Failed to create the file - " << FileName << endl << endl;
+			std::cout << "Failed to create the file - " << UNR_FileName << endl << endl;
 		}
 	}
 
@@ -348,7 +457,7 @@ int main()
 								INI_Update(mutatePassword->get_pwdAsIndicies(), mutatePassword->get_pwdAsText());
 								cout << endl
 									<< "++++++++++++++++++++++++++++++++++++++++" << endl
-									<< CIniFile::Content(FileName)
+									<< CIniFile::Content(UNR_FileName)
 									<< "++++++++++++++++++++++++++++++++++++++++" << endl;
 								exitRequest = true;
 								break;
@@ -417,8 +526,26 @@ int main()
 		}
 		pwdCount++;
 	}
+	if (exitRequest) return 2;
 	return 0;
 }   // main
+
+void commandLineError(string errorInfo) {
+	cout << errorInfo << endl;
+	cout << "unRAR-test.exe -f<file name> -i<file name -p[u,l,n,s][t,f] -h" << endl;
+	cout << "    -h help (this message) then exit" << endl
+		<< "    -f name of the target file" << endl
+		<< "    -i name of the UNR file" << endl
+		<< "    -p permutation control u = include upper case" << endl
+		<< "                           l = include lower case" << endl
+		<< "                           n = include numeric" << endl
+		<< "                           s = include specials" << endl
+		<< "                           T or F = for true or false" << endl << endl
+		<< "No spaces allowed between option character and the following ones." << endl << endl;
+	cout << " Return Codes 0-Success" << endl
+		<< "              1-command line error" << endl
+		<< "              2-user request exit \"-h\" option OR \"q\" keystroke" << endl;
+}   // commandLineError
 
 string elapsedTime()
 {
@@ -475,21 +602,21 @@ void INI_Update(string pwdIndiciesStr, string pwdStr)
 	char tmpStr[250];
 
 	pwdCountStr = to_string(pwdCount);
-	CIniFile::SetValue(Key_TrialCount, pwdCountStr, SectionName_CurrentState, FileName);
+	CIniFile::SetValue(Key_TrialCount, pwdCountStr, SectionName_CurrentState, UNR_FileName);
 
-	CIniFile::SetValue(Key_TrialValue, pwdIndiciesStr, SectionName_CurrentState, FileName);
-	CIniFile::SetRecordComments("# show plain TrialValue - " + pwdStr + "\n", Key_TrialValue, SectionName_CurrentState, FileName);
+	CIniFile::SetValue(Key_TrialValue, pwdIndiciesStr, SectionName_CurrentState, UNR_FileName);
+	CIniFile::SetRecordComments("# show plain TrialValue - " + pwdStr + "\n", Key_TrialValue, SectionName_CurrentState, UNR_FileName);
 
 	triesPerSec = (double)(pwdCount - startValue) / secondsDiff;
 	sprintf_s(tmpStr, sizeof(tmpStr), "%.2f", triesPerSec);
-	CIniFile::SetValue(Key_TrialsPerSec, tmpStr, SectionName_Performance, FileName);
+	CIniFile::SetValue(Key_TrialsPerSec, tmpStr, SectionName_Performance, UNR_FileName);
 
 	triesPerSec = (double)pwdCount / (pastTotalSeconds + secondsDiff);
 	sprintf_s(tmpStr, sizeof(tmpStr), "%.2f", triesPerSec);
-	CIniFile::SetValue(Key_AvgTrialsPerSec, tmpStr, SectionName_Performance, FileName);
+	CIniFile::SetValue(Key_AvgTrialsPerSec, tmpStr, SectionName_Performance, UNR_FileName);
 
-	CIniFile::SetValue(Key_TotalSeconds, to_string(pastTotalSeconds + secondsDiff), SectionName_Performance, FileName);
-	CIniFile::SetValue(Key_SessionSeconds, to_string(secondsDiff), SectionName_Performance, FileName);
+	CIniFile::SetValue(Key_TotalSeconds, to_string(pastTotalSeconds + secondsDiff), SectionName_Performance, UNR_FileName);
+	CIniFile::SetValue(Key_SessionSeconds, to_string(secondsDiff), SectionName_Performance, UNR_FileName);
 }   // INI_Update
 
 void infoLineStart(string pwdAsIndicies, string pwdAsText)
@@ -503,7 +630,7 @@ void infoLineStart(string pwdAsIndicies, string pwdAsText)
 		INI_Update(pwdAsIndicies, pwdAsText);
 		cout << endl
 			<< "++++++++++++++++++++++++++++++++++++++++" << endl
-			<< CIniFile::Content(FileName)
+			<< CIniFile::Content(UNR_FileName)
 			<< "++++++++++++++++++++++++++++++++++++++++";
 		showIniContent = false;
 		lastShowContent = currentSeconds;
